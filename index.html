@@ -33,7 +33,6 @@
 <!-- Library Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-    // Konfigurasi Supabase (Sudah terisi otomatis dengan data kamu)
     const SUPABASE_URL = 'https://axlcrefmflvwsxpoqie.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_ERRhTTNaC2oDDRPViJiuqw_8V6pMwgt'; 
     
@@ -43,66 +42,68 @@
     document.addEventListener("DOMContentLoaded", tampilkanDaftarFile);
 
     async function uploadFile() {
-        const namaTugas = document.getElementById('namaTugas').value.trim();
-        const fileInput = document.getElementById('fileTugas').files[0];
+        try {
+            const namaTugas = document.getElementById('namaTugas').value.trim();
+            const fileInput = document.getElementById('fileTugas').files[0];
 
-        if (!namaTugas || !fileInput) {
-            alert('Judul tugas dan file tidak boleh kosong!');
-            return;
-        }
+            if (!namaTugas || !fileInput) {
+                alert('Judul tugas dan file tidak boleh kosong!');
+                return;
+            }
 
-        // Buat nama file unik agar tidak bentrok
-        const fileName = Date.now() + '-' + fileInput.name;
+            // Buat nama file unik
+            const fileName = Date.now() + '-' + fileInput.name;
+            alert('Sedang meng-upload file, mohon tunggu...');
 
-        alert('Sedang meng-upload file...');
+            // 1. Upload file ke Supabase Storage
+            const { data, error } = await supabase.storage
+                .from(BUCKET_NAME)
+                .upload(fileName, fileInput);
 
-        // 1. Upload file ke Supabase Storage
-        const { data, error } = await supabase.storage
-            .from(BUCKET_NAME)
-            .upload(fileName, fileInput);
+            if (error) {
+                alert('Gagal upload ke Storage: ' + error.message);
+                return;
+            }
 
-        if (error) {
-            alert('Gagal upload: ' + error.message);
-            return;
-        }
+            // 2. Ambil Link Publik
+            const { data: publicUrlData } = supabase.storage
+                .from(BUCKET_NAME)
+                .getPublicUrl(fileName);
 
-        // 2. Ambil Link Publik file yang di-upload
-        const { data: publicUrlData } = supabase.storage
-            .from(BUCKET_NAME)
-            .getPublicUrl(fileName);
+            const fileUrl = publicUrlData.publicUrl;
 
-        const fileUrl = publicUrlData.publicUrl;
+            // 3. Simpan ke Database Tabel "tugas"
+            const { error: dbError } = await supabase
+                .from('tugas')
+                .insert([{ nama: namaTugas, url: fileUrl }]);
 
-        // 3. Simpan informasi judul & link file ke Database Tabel "tugas"
-        const { error: dbError } = await supabase
-            .from('tugas')
-            .insert([{ nama: namaTugas, url: fileUrl }]);
-
-        if (dbError) {
-            alert('File ter-upload, tapi gagal simpan ke database: ' + dbError.message);
-        } else {
-            alert('Berhasil menyimpan tugas dan file!');
-            document.getElementById('namaTugas').value = '';
-            document.getElementById('fileTugas').value = '';
-            tampilkanDaftarFile();
+            if (dbError) {
+                alert('Gagal simpan ke Database: ' + dbError.message);
+            } else {
+                alert('Berhasil menyimpan tugas dan file!');
+                document.getElementById('namaTugas').value = '';
+                document.getElementById('fileTugas').value = '';
+                tampilkanDaftarFile();
+            }
+        } catch (err) {
+            alert('Terjadi kesalahan sistem: ' + err.message);
         }
     }
 
     async function tampilkanDaftarFile() {
         const listContainer = document.getElementById('listTugas');
         
-        // Ambil data dari tabel "tugas"
         const { data, error } = await supabase
             .from('tugas')
             .select('*')
             .order('id', { ascending: false });
 
         if (error) {
-            listContainer.innerHTML = '<li>Gagal memuat daftar tugas.</li>';
+            listContainer.innerHTML = '<li>Gagal memuat daftar tugas: ' + error.message + '</li>';
             return;
         }
 
-        if (data.length === 0) {
+        if (!data || data.length === 0) {
             listContainer.innerHTML = '<p>Belum ada tugas yang tersimpan.</p>';
             return;
         }
