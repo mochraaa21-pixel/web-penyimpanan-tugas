@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Penyimpanan Tugas</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f9; color: #333; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        input, button { width: 100%; margin-bottom: 10px; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        ul { list-style-type: none; padding: 0; }
+        li { background: #e9ecef; margin-bottom: 8px; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+        a { color: #007bff; text-decoration: none; word-break: break-all; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Upload Tugas Supabase</h2>
+    <input type="text" id="namaTugas" placeholder="Judul / Nama Tugas...">
+    <input type="file" id="fileTugas">
+    <button onclick="mulaiUpload()">Upload & Simpan File</button>
+
+    <h3>Daftar Tugas:</h3>
+    <ul id="listTugas">
+        <li>Memuat data...</li>
+    </ul>
+</div>
+
+<!-- Menggunakan versi CDN Supabase yang stabil -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+    const SUPABASE_URL = 'https://axlcrefmflvwsxpoqie.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_ERRhTTNaC2oDDRPViJiuqw_8V6pMwgt';
+    
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    async function mulaiUpload() {
+        try {
+            const nama = document.getElementById('namaTugas').value.trim();
+            const fileInput = document.getElementById('fileTugas').files[0];
+
+            if (!nama || !fileInput) {
+                alert('Judul dan file tidak boleh kosong, bro!');
+                return;
+            }
+
+            alert('Memproses upload...');
+
+            const fileName = Date.now() + '-' + fileInput.name;
+
+            // 1. Upload ke Storage
+            const { data, error: storageError } = await supabase.storage
+                .from('tugas-file')
+                .upload(fileName, fileInput);
+
+            if (storageError) {
+                alert('Gagal Upload Storage: ' + storageError.message);
+                return;
+            }
+
+            // 2. Ambil URL Publik
+            const { data: urlData } = supabase.storage
+                .from('tugas-file')
+                .getPublicUrl(fileName);
+
+            const fileUrl = urlData.publicUrl;
+
+            // 3. Simpan ke Database Tabel 'tugas'
+            const { error: dbError } = await supabase
+                .from('tugas')
+                .insert([{ nama: nama, url: fileUrl }]);
+
+            if (dbError) {
+                alert('Gagal Simpan Database: ' + dbError.message);
+            } else {
+                alert('Sukses tersimpan!');
+                document.getElementById('namaTugas').value = '';
+                document.getElementById('fileTugas').value = '';
+                muatData();
+            }
+        } catch (err) {
+            alert('Terjadi error: ' + err.message);
+        }
+    }
+
+    async function muatData() {
+        const listTugas = document.getElementById('listTugas');
+        const { data, error } = await supabase
+            .from('tugas')
+            .select('*')
+            .order('id', { ascending: false });
+
+        if (error) {
+            listTugas.innerHTML = '<li>Gagal memuat: ' + error.message + '</li>';
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            listTugas.innerHTML = '<li>Belum ada tugas.</li>';
+            return;
+        }
+
+        listTugas.innerHTML = '';
+        data.forEach(item => {
+            let li = document.createElement('li');
+            li.innerHTML = `<div><strong>${item.nama}</strong><br><a href="${item.url}" target="_blank">📥 Download</a></div>`;
+            listTugas.appendChild(li);
+        });
+    }
+
+    // Jalankan saat halaman dibuka
+    muatData();
+</script>
+
+</body>
+</html>
