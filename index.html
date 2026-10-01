@@ -10,6 +10,7 @@
         input, button { width: 100%; margin-bottom: 10px; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
         button { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; }
         button:hover { background: #0056b3; }
+        #logStatus { font-size: 14px; color: #d9534f; margin-bottom: 10px; white-space: pre-wrap; font-weight: bold; }
         ul { list-style-type: none; padding: 0; }
         li { background: #e9ecef; margin-bottom: 8px; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
         a { color: #007bff; text-decoration: none; word-break: break-all; }
@@ -20,6 +21,7 @@
 
 <div class="container">
     <h2>Upload & Simpan File Tugas</h2>
+    <div id="logStatus"></div>
     <input type="text" id="namaTugas" placeholder="Judul / Nama Tugas...">
     <input type="file" id="fileTugas">
     <button onclick="uploadFile()">Upload & Simpan File</button>
@@ -33,60 +35,73 @@
 <!-- Library Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+    function log(pesan) {
+        document.getElementById('logStatus').innerText = pesan;
+        console.log(pesan);
+    }
+
     const SUPABASE_URL = 'https://axlcrefmflvwsxpoqie.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_ERRhTTNaC2oDDRPViJiuqw_8V6pMwgt'; 
     
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const BUCKET_NAME = 'tugas-file';
+    let supabase;
+    try {
+        supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        log("Sistem siap.");
+    } catch (e) {
+        log("Error inisialisasi Supabase: " + e.message);
+    }
 
     document.addEventListener("DOMContentLoaded", tampilkanDaftarFile);
 
     async function uploadFile() {
         try {
+            log("Tombol diklik, memproses...");
             const namaTugas = document.getElementById('namaTugas').value.trim();
             const fileInput = document.getElementById('fileTugas').files[0];
 
             if (!namaTugas || !fileInput) {
                 alert('Judul tugas dan file tidak boleh kosong!');
+                log('Error: Judul atau file kosong.');
                 return;
             }
 
-            // Buat nama file unik
             const fileName = Date.now() + '-' + fileInput.name;
-            alert('Sedang meng-upload file, mohon tunggu...');
+            log('Sedang meng-upload file ke Storage...');
 
-            // 1. Upload file ke Supabase Storage
+            // 1. Upload ke Storage
             const { data, error } = await supabase.storage
-                .from(BUCKET_NAME)
+                .from('tugas-file')
                 .upload(fileName, fileInput);
 
             if (error) {
-                alert('Gagal upload ke Storage: ' + error.message);
+                log('Gagal Storage: ' + error.message);
                 return;
             }
 
-            // 2. Ambil Link Publik
+            log('Mengambil URL publik...');
             const { data: publicUrlData } = supabase.storage
-                .from(BUCKET_NAME)
+                .from('tugas-file')
                 .getPublicUrl(fileName);
 
             const fileUrl = publicUrlData.publicUrl;
 
-            // 3. Simpan ke Database Tabel "tugas"
+            log('Menyimpan ke Database...');
+            // 2. Simpan ke Tabel Database
             const { error: dbError } = await supabase
                 .from('tugas')
                 .insert([{ nama: namaTugas, url: fileUrl }]);
 
             if (dbError) {
-                alert('Gagal simpan ke Database: ' + dbError.message);
+                log('Gagal Database: ' + dbError.message);
             } else {
-                alert('Berhasil menyimpan tugas dan file!');
+                log('Berhasil menyimpan tugas dan file!');
+                alert('Berhasil menyimpan tugas!');
                 document.getElementById('namaTugas').value = '';
                 document.getElementById('fileTugas').value = '';
                 tampilkanDaftarFile();
             }
         } catch (err) {
-            alert('Terjadi kesalahan sistem: ' + err.message);
+            log('Error Sistem: ' + err.message);
         }
     }
 
@@ -99,7 +114,7 @@
             .order('id', { ascending: false });
 
         if (error) {
-            listContainer.innerHTML = '<li>Gagal memuat daftar tugas: ' + error.message + '</li>';
+            listContainer.innerHTML = '<li>Gagal memuat daftar: ' + error.message + '</li>';
             return;
         }
 
