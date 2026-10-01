@@ -4,9 +4,68 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web Penyimpanan Tugas</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f9; color: #333; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        input, textarea, button { width: 100%; margin-bottom: 10px; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #28a745; color: white; border: none; font-weight: bold; cursor: pointer; }
+        button:hover { background: #218838; }
+        ul { list-style-type: none; padding: 0; }
+        li { background: #e9ecef; margin-bottom: 8px; padding: 10px; border-radius: 4px; }
+    </style>
 </head>
 <body>
-    <h1>Halo! Ini Website Pertamaku</h1>
-    <p>Dibuat langsung dari HP menggunakan Acode.</p>
+
+<div class="container">
+    <h2>Penyimpanan Tugas</h2>
+    <input type="text" id="namaTugas" placeholder="Judul Tugas...">
+    <textarea id="detailTugas" placeholder="Isi atau catatan tugas..."></textarea>
+    <button onclick="simpanTugas()">Simpan Tugas</button>
+
+    <h3>Daftar Tugas Tersimpan:</h3>
+    <ul id="listTugas"></ul>
+</div>
+
+<script>
+    // Memuat data saat halaman dibuka
+    document.addEventListener("DOMContentLoaded", tampilkanTugas);
+
+    function simpanTugas() {
+        const nama = document.getElementById("namaTugas").value;
+        const detail = document.getElementById("detailTugas").value;
+
+        if(nama === "" || detail === "") {
+            alert("Judul dan detail tugas tidak boleh kosong!");
+            return;
+        }
+
+        const tugasBaru = { nama, detail };
+        
+        // Ambil data lama dari LocalStorage atau buat array kosong
+        let daftarTugas = JSON.parse(localStorage.getItem("tugasKu")) || [];
+        daftarTugas.push(tugasBaru);
+
+        // Simpan kembali ke LocalStorage
+        localStorage.setItem("tugasKu", JSON.stringify(daftarTugas));
+
+        // Bersihkan form & tampilkan ulang
+        document.getElementById("namaTugas").value = "";
+        document.getElementById("detailTugas").value = "";
+        tampilkanTugas();
+    }
+
+    function tampilkanTugas() {
+        const list = document.getElementById("listTugas");
+        list.innerHTML = "";
+        let daftarTugas = JSON.parse(localStorage.getItem("tugasKu")) || [];
+
+        daftarTugas.forEach((tugas, index) => {
+            let li = document.createElement("li");
+            li.innerHTML = `<strong>${tugas.name || tugas.nama}</strong><br>${tugas.detail}`;
+            list.appendChild(li);
+        });
+    }
+</script>
+
 </body>
 </html>
